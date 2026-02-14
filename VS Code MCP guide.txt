@@ -1,41 +1,77 @@
-This guide only covers **connecting MCP servers to VS Code** (Copilot Chat / Agent mode).
-
-Important:
-* This repo does **not** include MCP servers.
-* If you don’t have a server yet, VS Code will show errors like `Cannot find module '/absolute/path/to/your-mcp-server.js'`. That is expected until you point `mcp.json` at a real server script.
+Below is the clean way to run the **two MCP servers in this repo** and connect them to **VS Code’s MCP client (Copilot Chat / Agent mode)**.
 
 ---
 
 ## 0) Prereqs (VS Code side)
 
-* **VS Code 1.99+** (that’s when MCP-in-Copilot support is documented). ([GitHub Docs][1])
-* You’ll use a workspace config file: **`<repo-root>/.vscode/mcp.json`**. ([GitHub Docs][1])
-* MCP servers should use **stdio transport**, which VS Code supports. ([Visual Studio Code][2])
+* **VS Code 1.99+**
+* **Node 18+** (the TypeScript server uses `fetch`)
+* **Python 3.10+**
+* You’ll use a workspace config file: **`<repo-root>/.vscode/mcp.json`**
+* These servers use **stdio transport**, which VS Code supports.
 
 ---
 
-## 1) Configure your servers inside VS Code (workspace MCP config)
+## 1) TypeScript MCP server (weather-server-typescript)
+
+### A. Install + build (in VS Code Terminal)
+```bash
+cd weather-server-typescript
+npm install
+npm run build
+```
+
+### B. Quick manual run (optional sanity check)
+```bash
+node build/index.js
+```
+
+It will “hang” waiting for a client—that’s normal for stdio servers. Press `Ctrl+C` to stop.
+
+---
+
+## 2) Python MCP server (weather-server-python)
+
+### A. Create venv + install
+```bash
+cd weather-server-python
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e .
+```
+
+### B. Quick manual run (optional sanity check)
+```bash
+python weather.py
+```
+
+Same “hang” behavior: it’s waiting on stdio.
+
+---
+
+## 3) Configure both servers inside VS Code (workspace MCP config)
 
 Create this file:
 
-**`<repo-root>/.vscode/mcp.json`** ([GitHub Docs][1])
+**`<repo-root>/.vscode/mcp.json`**
 
-Example config (Linux/macOS paths; replace the placeholders with real server scripts):
+Example config (Linux/macOS paths):
 
 ```json
 {
   "servers": {
-    "my-server-js": {
+    "weather-ts": {
       "type": "stdio",
       "command": "node",
-      "cwd": "${workspaceFolder}",
-      "args": ["/absolute/path/to/your-mcp-server.js"]
+      "cwd": "${workspaceFolder}/weather-server-typescript",
+      "args": ["${workspaceFolder}/weather-server-typescript/build/index.js"]
     },
-    "my-server-py": {
+    "weather-py": {
       "type": "stdio",
-      "command": "/absolute/path/to/venv/bin/python",
-      "cwd": "${workspaceFolder}",
-      "args": ["/absolute/path/to/your-mcp-server.py"]
+      "command": "${workspaceFolder}/weather-server-python/.venv/bin/python",
+      "cwd": "${workspaceFolder}/weather-server-python",
+      "args": ["${workspaceFolder}/weather-server-python/weather.py"]
     }
   }
 }
@@ -43,25 +79,26 @@ Example config (Linux/macOS paths; replace the placeholders with real server scr
 
 Key points:
 
-* VS Code MCP config is primarily `"servers": { ... }` (and optionally `"inputs": [...]` for secrets). ([Visual Studio Code][2])
-* Don’t start stdio servers via wrappers that print to **stdout** (e.g., `npm run ...`). For MCP stdio, stdout is the protocol channel—logs should go to stderr. (These quickstart servers already log to stderr, but package managers can add stdout noise.)
+* VS Code MCP config is primarily `"servers": { ... }` (and optionally `"inputs": [...]` for secrets).
+* Don’t start stdio servers via wrappers that print to **stdout** (e.g., `npm run ...`). For MCP stdio, stdout is the protocol channel—logs should go to stderr.
 
 **Windows tweak (Python):**
 
 ```json
-"command": "${workspaceFolder}\\mcp-client-python\\.venv\\Scripts\\python.exe"
+"command": "${workspaceFolder}\\weather-server-python\\.venv\\Scripts\\python.exe"
 ```
 
 ---
 
-## 2) Start + verify in VS Code
+## 4) Start + verify in VS Code
 
-1. Open **Command Palette** → run **`MCP: List Servers`** to confirm they appear. ([GitHub Docs][1])
-2. Open **Copilot Chat**, switch to **Agent** mode (tools-enabled). ([GitHub Docs][1])
-3. Use the tools picker to confirm you see tools from your configured servers.
+1. Open **Command Palette** → run **`MCP: List Servers`** to confirm they appear.
+2. Open **Copilot Chat**, switch to **Agent** mode (tools-enabled).
+3. Use the tools picker to confirm you see tools from:
+   * `weather-ts` (tools like `get-alerts`, `get-forecast`)
+   * `weather-py` (tools like `get_alerts`, `get_forecast`)
 
-If you don’t have a server yet:
-* Leave `.vscode/mcp.json` empty or remove the placeholder servers.
-* Expect connection errors until you add a real server script path.
+Try:
 
-For how to build a server: https://modelcontextprotocol.io/docs/develop/build-server
+* “Get weather alerts for TX”
+* “Get forecast for 32.7767, -96.7970”
